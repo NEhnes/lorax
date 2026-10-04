@@ -157,7 +157,7 @@ Confirm plan/tier supports what you need (shared pool has no group chats).
 **Done when:** texting the Photon line gets an in-character reply on a real phone.
 
 ### Phase 5 — Action kit
-User says "pester <company>". Agent researches, then returns: 3 sourced facts, a drafted email, a drafted social post, the company's public contact page. Human sends.
+User says "pester <company>". Agent researches, then returns: 3 sourced facts, a drafted email, a drafted social post, and the company's public contact page only when supported by an actual search result; otherwise it says the page wasn't found. Drafts are for the human to send; companies are never messaged by the agent.
 **Done when:** kit is generated and every claim has a source URL.
 
 ### Phase 6 — Guardrails + prank mode

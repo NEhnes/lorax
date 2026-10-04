@@ -8,17 +8,22 @@ export function extractToolCalls(toolCalls: any[]) {
   }));
 }
 
-function validateClaims(claims: any[]) {
+export function validateClaims(claims: any[], searchResults: Set<string>) {
   if (!Array.isArray(claims)) return "claims must be an array";
+  if (claims.length !== 3) return "exactly three claims are required";
   for (const c of claims) {
     if (!c || typeof c.text !== "string") return "each claim must have a text field";
+    if (!c.text.trim()) return "each claim must have non-empty text";
     if (!c.source_url || typeof c.source_url !== "string") return "each claim must have a source_url";
     if (!/^https?:\/\//.test(c.source_url)) return "source_url must be an http(s) url";
+    if (!searchResults.has(c.source_url)) {
+      return `source_url must match a URL returned by web_search: ${c.source_url}`;
+    }
   }
   return null;
 }
 
-export async function runToolCall(name: string, args: any) {
+export async function runToolCall(name: string, args: any, searchResults = new Set<string>()) {
   if (name === "web_search") {
     const q = (args && (args.query || args.q || args.term)) || args;
     if (!q || typeof q !== "string") return { tool: name, error: "missing query string" };
@@ -60,12 +65,7 @@ export async function runToolCall(name: string, args: any) {
         if (out.length >= 5) break;
       }
 
-      // Fallback: if no results, provide a safe search link so callers have somewhere to click
-      if (out.length === 0) {
-        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
-        out.push({ title: `Search results for ${q}`, url: searchUrl, snippet: "Search link (fallback)" });
-      }
-
+      for (const result of out) searchResults.add(result.url);
       return { tool: name, query: q, results: out };
     } catch (e: any) {
       return { tool: name, error: `search error: ${String(e)}` };
@@ -77,7 +77,7 @@ export async function runToolCall(name: string, args: any) {
     const claims = args && args.claims;
     if (!company || typeof company !== "string") return { tool: name, error: "missing company" };
 
-    const err = validateClaims(claims);
+    const err = validateClaims(claims, searchResults);
     if (err) return { tool: name, error: `invalid claims: ${err}` };
 
     try {

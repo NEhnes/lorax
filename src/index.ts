@@ -25,7 +25,7 @@ for await (const [space, message] of app.messages) {
   if (message.platform !== "imessage" || message.content.type !== "text") continue;
 
   const reply = await runAgent(message.sender?.id, message.content.text);
-  const replyText = reply.slice(0, 299).replace(/[\uD800-\uDBFF]$/, "");
+  const replyText = reply;
   if (dryRun) {
     console.log(`Dry-run reply to ${message.sender?.id ?? "unknown sender"}: ${replyText}`);
     continue;

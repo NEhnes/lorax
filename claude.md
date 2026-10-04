@@ -9,7 +9,7 @@ Hackathon tracks: sustainability, Photon agentic messaging, built with Cursor/Cl
 - Build **one phase at a time**. After each phase: run it, show the result, **stop and wait for approval**.
 - Ask before adding any dependency.
 - Never invent Photon APIs. Read the docs (Stable version only): https://photon.codes/docs/llms.txt
-- Verify the Claude model string at https://docs.claude.com before use. Read it from `ANTHROPIC_MODEL`.
+- Use OpenRouter's OpenAI-compatible API (`OPENROUTER_BASE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`); do not use the Anthropic API or SDK.
 - Keep files small. No frameworks beyond what's listed.
 - `DRY_RUN=true` is the default. Real sends only when explicitly set.
 
@@ -17,7 +17,7 @@ Hackathon tracks: sustainability, Photon agentic messaging, built with Cursor/Cl
 
 - Runtime: Bun + TypeScript
 - Messaging: `spectrum-ts` (Photon). Cloud iMessage provider for prod, `terminal` provider for dev (no credentials needed)
-- Brain: `@anthropic-ai/sdk`, manual tool-use loop
+- Brain: OpenRouter Chat Completions API via `fetch`, manual tool-use loop
 - State: `bun:sqlite`
 - Deploy: laptop for demo; Railway/Fly/Render worker if needed (long-lived process, not serverless)
 
@@ -58,8 +58,9 @@ README.md         architecture + demo script + track mapping
 ```
 SPECTRUM_PROJECT_ID=
 SPECTRUM_PROJECT_SECRET=
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_API_KEY= # set locally; never commit secrets
+OPENROUTER_MODEL=xiaomi/mimo-v2.5
 DRY_RUN=true
 ALLOWED_RECIPIENTS=+1...,+1...     # E.164, outbound allowlist
 ADMIN_PHONES=+1...
@@ -97,14 +98,19 @@ await dm.send("opener text");
 Agent loop shape:
 
 ```ts
-// agent.ts
-let messages = [{ role: "user", content: text }];
+// OpenRouter agent loop shape (fetch the OpenAI-compatible Chat Completions endpoint)
+let messages = [{ role: "system", content: LORAX }, { role: "user", content: text }];
 while (true) {
-  const res = await client.messages.create({ model, system: LORAX, tools, messages, max_tokens: 1000 });
-  messages.push({ role: "assistant", content: res.content });
-  if (res.stop_reason !== "tool_use") return textOf(res);
-  const results = await Promise.all(toolCalls(res).map(runTool));  // guardrails inside
-  messages.push({ role: "user", content: results });
+  const res = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: OPENROUTER_MODEL, messages, tools }),
+  });
+  const completion = await res.json();
+  const message = completion.choices[0].message;
+  messages.push(message);
+  if (!message.tool_calls?.length) return message.content;
+  // Execute tool calls and append results using role "tool" and matching tool_call_id.
 }
 ```
 
@@ -112,7 +118,7 @@ while (true) {
 
 | Tool | Purpose |
 |---|---|
-| `web_search` | Anthropic server-side web search. Facts on a company's forest record |
+| `web_search` | DuckDuckGo Instant Answer API. Facts on a company's forest record |
 | `save_dossier(company, claims[{text, source_url}])` | Persist sourced claims |
 | `schedule_nudge(phone, delay_min, intent)` | Prank follow-up. Guardrails enforced |
 | `mute(phone)` | Stop all contact |
@@ -130,7 +136,7 @@ Agent never gets a raw `send_sms` tool. Outbound goes through `guardrails.ts` on
 ## Phases
 
 ### Phase 0 — Scaffold
-`bun init`, install `spectrum-ts @anthropic-ai/sdk`, `.env.example`, `README.md` stub.
+`bun init`, install `spectrum-ts`, `.env.example`, `README.md` stub.
 **Done when:** `bun run dev` starts with no errors.
 
 ### Phase 1 — Terminal echo
@@ -138,7 +144,7 @@ Spectrum + `terminal` provider. Echo input.
 **Done when:** typing in terminal returns an echo.
 
 ### Phase 2 — Lorax replies
-Add `persona.ts` + single Claude call, no tools.
+Add `persona.ts` + single OpenRouter chat completion call, no tools.
 **Done when:** terminal chat replies in character, under 300 chars.
 
 ### Phase 3 — Agent loop + tools
@@ -146,7 +152,7 @@ Add `persona.ts` + single Claude call, no tools.
 **Done when:** "what's [company]'s deforestation record?" returns sourced claims and a saved dossier.
 
 ### Phase 4 — Real iMessage (inbound)
-Swap to `imessage.config()`, `DRY_RUN` still true for outbound.
+Use `imessage.config()` with Photon project credentials. `DRY_RUN` defaults to true: generated replies are logged, not sent. Set it to false only for an explicitly authorized live test.
 Confirm plan/tier supports what you need (shared pool has no group chats).
 **Done when:** texting the Photon line gets an in-character reply on a real phone.
 

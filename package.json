@@ -7,7 +7,6 @@
     "dev": "bun run src/index.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.131.0",
     "spectrum-ts": "^12.10.1"
   },
   "devDependencies": {

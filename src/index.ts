@@ -1,16 +1,26 @@
 import { Spectrum } from "spectrum-ts";
-import { terminal } from "spectrum-ts/providers/terminal";
+import { imessage } from "spectrum-ts/providers/imessage";
 import { runAgent } from "./agent";
 
 const app = await Spectrum({
-  providers: [terminal.config()],
+  projectId: process.env.SPECTRUM_PROJECT_ID!,
+  projectSecret: process.env.SPECTRUM_PROJECT_SECRET!,
+  providers: [imessage.config()],
 });
 
-console.log("Lorax Hotline ready. Talk to the trees.");
+const dryRun = process.env.DRY_RUN !== "false";
+
+console.log(`Lorax Hotline ready on iMessage. Dry run: ${dryRun}`);
 
 for await (const [space, message] of app.messages) {
-  if (message.content.type !== "text") continue;
+  if (message.platform !== "imessage" || message.content.type !== "text") continue;
 
-  const replyText = await runAgent(message.sender?.id, message.content.text);
-  await space.send(replyText.slice(0, 299));
+  const reply = await runAgent(message.sender?.id, message.content.text);
+  const replyText = reply.slice(0, 299).replace(/[\uD800-\uDBFF]$/, "");
+  if (dryRun) {
+    console.log(`Dry-run reply to ${message.sender?.id ?? "unknown sender"}: ${replyText}`);
+    continue;
+  }
+
+  await space.send(replyText);
 }

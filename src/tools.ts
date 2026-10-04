@@ -1,14 +1,11 @@
 import { saveDossier, getDossier } from "./store.js";
 
-export function extractToolCalls(content: any[]) {
-  // naive: find any block with type "tool"
-  const calls: any[] = [];
-  for (const block of content) {
-    if (block.type === "tool" && block.tool_call) {
-      calls.push({ name: block.tool_call.name, arguments: block.tool_call.arguments });
-    }
-  }
-  return calls;
+export function extractToolCalls(toolCalls: any[]) {
+  return toolCalls.map((call) => ({
+    id: call.id,
+    name: call.function.name,
+    arguments: JSON.parse(call.function.arguments || "{}"),
+  }));
 }
 
 function validateClaims(claims: any[]) {

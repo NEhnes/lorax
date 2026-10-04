@@ -1,27 +1,14 @@
 import fs from "fs";
 import path from "path";
-import {
-  addFriend,
-  allPendingNudges,
-  listFriends,
-  listMutes,
-  mute,
-  removeFriend,
-  unmute,
-  type NudgeKind,
-} from "./store";
-import { createNudge } from "./prank";
+import { listMutes, mute, unmute } from "./store";
 
 const ENV_PATH = path.resolve(process.cwd(), ".env");
 
 const USAGE = `Lorax Hotline admin
 
-  bun run cli add-friend +15551234567 [name]   allowlist a friend for prank mode
-  bun run cli remove-friend +1555...          drop a friend from the allowlist
   bun run cli mute +15551234567 [reason]      stop all contact, permanently
   bun run cli unmute +15551234567             lift a mute
-  bun run cli list                            show friends, mutes, pending nudges
-  bun run cli nudge +1555... opener|followup "intent" [delay_min]
+  bun run cli list                            show mutes and dossiers
   bun run cli dry-run on|off                  flip DRY_RUN in .env`;
 
 function setEnvValue(key: string, value: string) {
@@ -70,20 +57,6 @@ function attempt<T>(label: string, fn: () => T): T | undefined {
 }
 
 switch (command) {
-  case "add-friend": {
-    if (!args[0]) {
-      console.error("usage: bun run cli add-friend <phone> [name]");
-      process.exit(1);
-    }
-    const p = attempt("add-friend", () => addFriend(args[0], args[1]));
-    console.log(`allowlisted ${p}`);
-    break;
-  }
-  case "remove-friend": {
-    const removed = attempt("remove-friend", () => removeFriend(args[0] ?? ""));
-    console.log(removed ? `removed ${args[0]}` : `${args[0]} was not allowlisted`);
-    break;
-  }
   case "mute": {
     if (!args[0]) {
       console.error("usage: bun run cli mute <phone> [reason]");
@@ -98,37 +71,10 @@ switch (command) {
     break;
   }
   case "list": {
-    const friends = listFriends();
-    console.log(`friends (${friends.length}):`);
-    for (const f of friends) console.log(`  ${f.phone}${f.name ? `  ${f.name}` : ""}`);
     const mutes = listMutes();
     console.log(`mutes (${mutes.length}):`);
     for (const m of mutes) console.log(`  ${m.phone}  ${m.reason ?? ""}`);
-    const pending = allPendingNudges();
-    console.log(`pending nudges (${pending.length}):`);
-    for (const n of pending) {
-      console.log(`  ${n.phone}  ${n.kind}  ${new Date(n.send_at).toLocaleString()}  ${n.intent}`);
-    }
     printDossiers();
-    break;
-  }
-  case "nudge": {
-    const [phone, kind, intent, delayMin] = args;
-    if (!phone || !intent || (kind !== "opener" && kind !== "followup")) {
-      console.error('usage: bun run cli nudge <phone> opener|followup "intent" [delay_min]');
-      process.exit(1);
-    }
-    const delay = Number(delayMin ?? 0);
-    const nudge = attempt("nudge", () =>
-      createNudge({
-        phone,
-        kind: kind as NudgeKind,
-        intent,
-        sendAt: Date.now() + (Number.isFinite(delay) ? delay : 0) * 60_000,
-      }),
-    );
-    if (!nudge) break;
-    console.log(`nudge ${nudge.id} -> ${nudge.phone} at ${new Date(nudge.send_at).toLocaleString()}`);
     break;
   }
   case "dry-run": {

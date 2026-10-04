@@ -230,6 +230,20 @@ describe("claims without a source", () => {
 });
 
 describe("database", () => {
+  test("creates the database directory when it does not exist", () => {
+    const nestedDb = path.join(os.tmpdir(), `lorax-missing-${Date.now()}`, "nested", "lorax.db");
+    process.env.LORAX_DB_PATH = nestedDb;
+    store.closeDb();
+
+    expect(() => store.getDb()).not.toThrow();
+    expect(fs.existsSync(nestedDb)).toBe(true);
+
+    store.closeDb();
+    fs.rmSync(path.dirname(path.dirname(nestedDb)), { recursive: true, force: true });
+    process.env.LORAX_DB_PATH = TMP_DB;
+    store.getDb();
+  });
+
   test("stores mutes, friends, and nudges on disk", () => {
     store.createNudge({ phone: FRIEND, kind: "opener", intent: "tease", sendAt: atLocalHour(14) });
     const nudge = store.dueNudges(Date.now());

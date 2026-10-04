@@ -1,6 +1,5 @@
 import { saveDossier, getDossier } from "./dossiers.js";
-import { canSendPrank, isQuietHour } from "./guardrails.js";
-import { createNudge, isFriend, mute as mutePhone } from "./store.js";
+import { mute as mutePhone } from "./store.js";
 
 export function extractToolCalls(toolCalls: any[]) {
   return toolCalls.map((call) => ({
@@ -89,40 +88,6 @@ export async function runToolCall(name: string, args: any, searchResults = new S
     } catch (e: any) {
       return { tool: name, error: String(e) };
     }
-  }
-
-  if (name === "schedule_nudge") {
-    const phone = args && args.phone;
-    const intent = args && args.intent;
-    const delayMin = Number(args?.delay_min ?? 0);
-    if (!phone || typeof phone !== "string") return { tool: name, error: "missing phone" };
-    if (!intent || typeof intent !== "string") return { tool: name, error: "missing intent" };
-    if (!isFriend(phone)) return { tool: name, error: "not on the friends allowlist" };
-
-    const kind = delayMin > 0 ? "followup" : "opener";
-    const decision = canSendPrank(phone, kind === "opener" ? "prank_opener" : "prank_followup");
-    if (!decision.ok && !decision.retryAt) {
-      return { tool: name, error: `guardrail blocked this nudge: ${decision.reason}` };
-    }
-
-    // Quiet hours or spacing defer rather than refuse: schedule for the first
-    // legal moment instead.
-    const at = decision.ok ? Date.now() : (decision.retryAt ?? Date.now());
-    const nudge = createNudge({
-      phone,
-      kind,
-      intent,
-      sendAt: at + (Number.isFinite(delayMin) ? delayMin : 0) * 60_000,
-    });
-    return {
-      tool: name,
-      nudge_id: nudge.id,
-      phone: nudge.phone,
-      kind: nudge.kind,
-      send_at: new Date(nudge.send_at).toISOString(),
-      note: decision.ok ? undefined : `deferred until ${new Date(nudge.send_at).toISOString()}: ${decision.reason}`,
-      quiet_hours: isQuietHour(nudge.send_at),
-    };
   }
 
   if (name === "mute") {

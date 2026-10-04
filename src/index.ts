@@ -2,7 +2,7 @@ import { Spectrum } from "spectrum-ts";
 import { imessage } from "spectrum-ts/providers/imessage";
 import { runAgent } from "./agent";
 import { canReply, isStopRequest } from "./guardrails";
-import { startPrankScheduler } from "./prank";
+import { splitMessage } from "./message";
 import { isMuted, logSend, mute, touchUser } from "./store";
 
 const app = await Spectrum({
@@ -21,7 +21,7 @@ const im = imessage(app);
 async function sendToFriend(phone: string, text: string) {
   const friend = await im.user(phone);
   const dm = await im.space.create(friend);
-  await dm.send(text);
+  for (const chunk of splitMessage(text)) await dm.send(chunk);
 }
 
 const testTo = process.env.TEST_TO;
@@ -31,9 +31,6 @@ if (process.env.SEND_TEST_MESSAGE === "true" && testTo) {
   await dm.send("Test message from Lorax.");
   console.log(`Sent test iMessage to ${testTo}`);
 }
-
-startPrankScheduler(sendToFriend);
-console.log("Prank scheduler started.");
 
 for await (const [space, message] of app.messages) {
   if (message.platform !== "imessage" || message.content.type !== "text") continue;
@@ -47,7 +44,9 @@ for await (const [space, message] of app.messages) {
       mute(sender, "asked to stop");
       console.log(`Muted ${sender} permanently.`);
     }
-    if (!dryRun) await space.send("Understood. I will not contact you again.");
+    if (!dryRun) {
+      for (const chunk of splitMessage("Understood. I will not contact you again.")) await space.send(chunk);
+    }
     continue;
   }
 
@@ -74,6 +73,6 @@ for await (const [space, message] of app.messages) {
     continue;
   }
 
-  await space.send(reply);
+  for (const chunk of splitMessage(reply)) await space.send(chunk);
   if (sender) logSend({ phone: sender, kind: "reply", status: "sent", body: reply });
 }

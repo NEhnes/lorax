@@ -1,4 +1,5 @@
 import { Database } from "bun:sqlite";
+import fs from "fs";
 import path from "path";
 
 export type SendKind = "reply" | "prank_opener" | "prank_followup";
@@ -25,7 +26,9 @@ export function dbPath() {
 
 export function getDb() {
   if (db) return db;
-  db = new Database(dbPath(), { create: true });
+  const filename = dbPath();
+  fs.mkdirSync(path.dirname(filename), { recursive: true });
+  db = new Database(filename, { create: true });
   db.exec("PRAGMA journal_mode = WAL");
   db.exec(`
     CREATE TABLE IF NOT EXISTS friends (

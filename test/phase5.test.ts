@@ -119,9 +119,9 @@ describe("runAgent response limit", () => {
 
   test("reports a cut-off completion instead of returning incomplete text", async () => {
     await expect(runAgent(undefined, "pester Acme")).resolves.toBe(
-      "The action kit exceeded the 250-token response limit and was cut off. Please retry with a narrower request.",
+      "The action kit exceeded the 4096-token response limit and was cut off. Please retry with a narrower request.",
     );
-    expect(requestBody?.max_tokens).toBe(250);
+    expect(requestBody?.max_tokens).toBe(4096);
   });
 
   test("stops if a cut-off completion includes partial tool calls", async () => {
@@ -140,7 +140,7 @@ describe("runAgent response limit", () => {
     };
 
     await expect(runAgent(undefined, "pester Acme")).resolves.toBe(
-      "The action kit exceeded the 250-token response limit and was cut off. Please retry with a narrower request.",
+      "The action kit exceeded the 4096-token response limit and was cut off. Please retry with a narrower request.",
     );
   });
 });

@@ -44,24 +44,6 @@ const tools = [
   {
     type: "function",
     function: {
-      name: "schedule_nudge",
-      description:
-        "Queue a prank text to a friend who has explicitly agreed to banter. Use delay_min=0 for the one opener; a positive delay_min queues a follow-up (max 2 per friend). The message is written for you and passes through guardrails: text only, no links, ends with a question, never between 21:00 and 09:00 local.",
-      parameters: {
-        type: "object",
-        properties: {
-          phone: { type: "string", description: "E.164 number of an allowlisted friend." },
-          delay_min: { type: "number", description: "0 for the opener, minutes from now for a follow-up." },
-          intent: { type: "string", description: "What the message should playfully goad them about." },
-        },
-        required: ["phone", "intent"],
-        additionalProperties: false,
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
       name: "mute",
       description: "Permanently stop all contact with a number. Use when someone asks to stop.",
       parameters: {
@@ -126,7 +108,7 @@ export async function runAgent(senderId: string | undefined, text: string) {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ model, messages, tools, max_tokens: 250 }),
+      body: JSON.stringify({ model, messages, tools, max_tokens: 4096 }),
     });
     if (!response.ok) {
       throw new Error(`OpenRouter request failed (${response.status}): ${await response.text()}`);
@@ -139,7 +121,7 @@ export async function runAgent(senderId: string | undefined, text: string) {
 
     const toolCalls = extractToolCalls(message.tool_calls || []);
     if (res.choices?.[0]?.finish_reason === "length") {
-      return "The action kit exceeded the 250-token response limit and was cut off. Please retry with a narrower request.";
+      return "The action kit exceeded the 4096-token response limit and was cut off. Please retry with a narrower request.";
     }
 
     if (toolCalls.length === 0) {

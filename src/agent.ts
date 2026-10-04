@@ -41,6 +41,37 @@ const tools = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "schedule_nudge",
+      description:
+        "Queue a prank text to a friend who has explicitly agreed to banter. Use delay_min=0 for the one opener; a positive delay_min queues a follow-up (max 2 per friend). The message is written for you and passes through guardrails: text only, no links, ends with a question, never between 21:00 and 09:00 local.",
+      parameters: {
+        type: "object",
+        properties: {
+          phone: { type: "string", description: "E.164 number of an allowlisted friend." },
+          delay_min: { type: "number", description: "0 for the opener, minutes from now for a follow-up." },
+          intent: { type: "string", description: "What the message should playfully goad them about." },
+        },
+        required: ["phone", "intent"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "mute",
+      description: "Permanently stop all contact with a number. Use when someone asks to stop.",
+      parameters: {
+        type: "object",
+        properties: { phone: { type: "string" } },
+        required: ["phone"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 export function validateContactPage(content: string, searchResults: Array<{ title: string; snippet: string; url: string }>) {

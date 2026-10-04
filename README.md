@@ -46,20 +46,25 @@ The project explores using conversational AI to turn environmental research into
 ### Testing and Safety
 - Manually verified inbound and outbound iMessage delivery.
 - Defaults to dry-run mode; real replies require `DRY_RUN=false`.
-- [ADD OTHER VERIFIED TEST RESULTS OR METRICS]
+- Guardrails gate every send: allowlist, mute, quiet hours, per-friend caps, and opener text rules.
+- 45 automated tests cover the guardrail decision function and prove the transport is never called on a blocked send.
 
 ## Technical Summary
 
-The runtime receives text messages through Spectrum, passes them to the agent, and sends the response unless dry-run mode is active. The agent uses OpenRouter tool calls for search and dossier persistence; dossiers are stored as JSON under `data/dossiers/`.
+The runtime receives text messages through Spectrum, passes them to the agent, and sends the response unless dry-run mode is active. The agent uses OpenRouter tool calls for search and dossier persistence; dossiers are stored as JSON under `data/dossiers/`. Outbound prank messages are scheduled nudges drained by a poller, and every send passes through the guardrail layer first.
 
 ### Messaging and Agent
-- `src/index.ts` routes inbound iMessages and controls dry-run sending.
+- `src/index.ts` routes inbound iMessages, honors STOP immediately, and controls dry-run sending.
 - `src/agent.ts` manages the model/tool loop and prepares action-kit responses.
 - `src/persona.ts` defines the short, original forest-guardian voice.
 
 ### Tools and State
-- `src/tools.ts` queries DuckDuckGo Instant Answer and validates dossier source URLs.
-- `src/store.ts` persists dossier records locally.
+- `src/tools.ts` queries DuckDuckGo Instant Answer, validates dossier source URLs, and schedules guarded nudges.
+- `src/store.ts` holds operational state (users, mutes, allowlist, nudges, send log) in `data/lorax.db`.
+- `src/dossiers.ts` persists dossier records as JSON under `data/dossiers/`.
+- `src/guardrails.ts` decides whether a send is allowed, blocked, or deferred to a later legal time.
+- `src/prank.ts` polls due nudges, generates opener/follow-up copy, and refuses to call the transport on any block.
+- `src/cli.ts` is the admin surface: allowlist, mute, nudge, and dry-run toggles.
 - Search coverage and full action-kit output have not been verified end-to-end.
 
 ## Design Challenges
@@ -67,6 +72,9 @@ The runtime receives text messages through Spectrum, passes them to the agent, a
 - **Keep outreach human-controlled** → Automated company messaging could create unwanted contact → Make the agent prepare drafts and leave sending to the user.
 - **Avoid unsourced dossier claims** → Model-generated facts may be unreliable → Require saved claim URLs to match results returned by the search tool.
 - **Test safely against a live messaging provider** → Real sends affect recipients → Default to dry-run and make live replies an explicit environment setting.
+- **Bound unsolicited contact to friends** → A prank bot could reach strangers or over-message a friend → Require an explicit allowlist, cap one opener plus two follow-ups per friend, and defer sends into quiet hours (21:00–09:00 local).
+- **Make "stop" absolute** → A recipient asking to stop must never be re-contacted → Detect stop phrasing before any other handling, mute permanently, and block even allowlisted friends.
+- **Keep generation from bypassing policy** → The model writes the message text, so it could emit a link or a non-question → Validate generated copy before the send and drop the nudge on failure.
 
 ## Run Locally
 
@@ -76,6 +84,20 @@ Requirements: [BUN VERSION] and configured Spectrum and OpenRouter credentials.
 2. Copy `.env.example` to `.env` and set the required credentials and model.
 3. Start with `bun run dev`.
 
-`DRY_RUN` defaults to `true`. Set it to `false` only when you intend to send replies through the connected iMessage provider. Keep secrets in `.env`; do not commit them.
+`DRY_RUN` defaults to `true`. Set it to `false` only when you intend to send replies through the connected iMessage provider. `PRANK_DRY_RUN` defaults to `true` and gates scheduled nudges only. Keep secrets in `.env`; do not commit them.
+
+### Admin CLI
+
+```
+bun run cli add-friend +15551234567 [name]   allowlist a friend for prank mode
+bun run cli remove-friend +1555...          drop a friend from the allowlist
+bun run cli mute +15551234567 [reason]      stop all contact, permanently
+bun run cli unmute +15551234567             lift a mute
+bun run cli list                            show friends, mutes, and dossiers
+bun run cli nudge +1555... opener|followup "intent" [delay_min]
+bun run cli dry-run on|off                  flip DRY_RUN in .env
+```
+
+Scheduled nudges only reach allowlisted, unmuted friends during waking hours. A stop request mutes a sender permanently, even if they remain allowlisted.
 
 To request an action kit, text `pester <company>`. Review any generated research and draft before using it; source coverage and end-to-end action-kit behavior still need verification.

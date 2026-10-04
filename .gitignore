@@ -1,3 +1,6 @@
 node_modules/
 .env
 .openclaude/worktrees/
+
+# Runtime state: allowlisted phone numbers, mutes, and the send log live here.
+data/
